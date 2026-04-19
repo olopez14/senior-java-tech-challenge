@@ -1,41 +1,28 @@
 package org.demo.seniorjavatechchallenge.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.demo.seniorjavatechchallenge.domain.Price;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
-public interface PriceRepository extends JpaRepository<Price, Long> {
+
+public interface PriceRepository {
 
     List<Price> findByProductIdOrderByInitDateAsc(Long productId);
 
-    @Query("""
-            select p
-            from Price p
-            where p.product.id = :productId
-              and p.initDate <= :date
-              and (p.endDate is null or p.endDate >= :date)
-            order by p.initDate desc
-            """)
-    List<Price> findCurrentPrices(@Param("productId") Long productId, @Param("date") LocalDate date, Pageable pageable);
+    Optional<Price> findCurrentPrice(Long productId, LocalDate date);
 
-    @Query("""
-            select count(p) > 0
-            from Price p
-            where p.product.id = :productId
-              and (
-                    (:endDate is null and (p.endDate is null or p.endDate >= :initDate))
-                    or
-                    (:endDate is not null and p.initDate <= :endDate and (p.endDate is null or p.endDate >= :initDate))
-                  )
-            """)
-    boolean existsOverlappingPrice(
-            @Param("productId") Long productId,
-            @Param("initDate") LocalDate initDate,
-            @Param("endDate") LocalDate endDate);
+    
+    Optional<BigDecimal> findCurrentPriceValue(Long productId, LocalDate date);
+
+    boolean existsOverlappingPrice(Long productId, LocalDate initDate, LocalDate endDate);
+
+    Price save(Price price);
 }
+
+
+
+
 

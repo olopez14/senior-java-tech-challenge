@@ -4,10 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -49,6 +46,8 @@ class PriceServiceTest {
     @BeforeEach
     void setUp() {
         mockProduct = new Product("Test Product", "Test Description");
+        mockProduct = spy(mockProduct);
+        lenient().when(mockProduct.getId()).thenReturn(productId);
     }
 
     @Test
@@ -159,17 +158,12 @@ class PriceServiceTest {
     @DisplayName("Should return current price when found for given date")
     void getCurrentPrice_WithValidDate_ReturnsPriceResponse() {
         LocalDate date = LocalDate.of(2024, 4, 15);
-        Price mockPrice = new Price(mockProduct, new BigDecimal("99.99"),
-                                    LocalDate.of(2024, 1, 1),
-                                    LocalDate.of(2024, 6, 30));
-
-        when(productService.findProductOrThrow(productId)).thenReturn(mockProduct);
-        when(priceRepository.findCurrentPrice(productId, date)).thenReturn(Optional.of(mockPrice));
+        when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.of(new BigDecimal("99.99")));
 
         var response = priceService.getCurrentPrice(productId, date);
 
         assertEquals(new BigDecimal("99.99"), response.value());
-        verify(priceRepository, times(1)).findCurrentPrice(productId, date);
+        verify(priceRepository, times(1)).findCurrentPriceValue(productId, date);
     }
 
     @Test
@@ -178,7 +172,7 @@ class PriceServiceTest {
         LocalDate date = LocalDate.of(2024, 4, 15);
 
         when(productService.findProductOrThrow(productId)).thenReturn(mockProduct);
-        when(priceRepository.findCurrentPrice(productId, date)).thenReturn(Optional.empty());
+        when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.empty());
 
         assertThrows(PriceNotFoundForDateException.class,
                      () -> priceService.getCurrentPrice(productId, date));
@@ -189,12 +183,17 @@ class PriceServiceTest {
     void getCurrentPrice_WithNonExistentProduct_ThrowsProductNotFoundException() {
         LocalDate date = LocalDate.of(2024, 4, 15);
 
+        when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.empty());
         when(productService.findProductOrThrow(productId)).thenThrow(new ProductNotFoundException(productId));
 
         assertThrows(ProductNotFoundException.class,
                      () -> priceService.getCurrentPrice(productId, date));
-        verify(priceRepository, never()).findCurrentPrice(anyLong(), any(LocalDate.class));
+        verify(priceRepository, times(1)).findCurrentPriceValue(productId, date);
+        verify(productService, times(1)).findProductOrThrow(productId);
     }
 
 }
+
+
+
 

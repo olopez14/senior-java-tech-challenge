@@ -7,25 +7,28 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
-@AutoconfigureM
-@DisplayName("Integración mínima API productos y precios")
+@DisplayName("IntegraciÃ³n  API productos y precios (MockMvc via WebApplicationContext)")
 class ProductPriceIntegrationTest {
 
     @Autowired
-    MockMvc mockMvc;
+    WebApplicationContext wac;
 
     @Test
-    @DisplayName("Crear producto, añadir precio, consultar precio vigente e historial")
+    @DisplayName("Crear producto, aÃ±adir precio, consultar precio vigente e historial")
     void minimalIntegrationFlow() throws Exception {
-        // 1. Crear producto
+        MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
+
+        
         String productJson = "{" +
                 "\"name\":\"Zapatillas deportivas\"," +
-                "\"description\":\"Modelo 2025 edición limitada\"}";
+                "\"description\":\"Modelo 2025 ediciÃ³n limitada\"}";
         ResultActions createProduct = mockMvc.perform(post("/products")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(productJson))
@@ -34,7 +37,7 @@ class ProductPriceIntegrationTest {
         String productId = createProduct.andReturn().getResponse().getContentAsString()
                 .replaceAll(".*\"id\":(\\d+).*", "$1");
 
-        // 2. Añadir precio
+        
         String priceJson = "{" +
                 "\"value\":99.99," +
                 "\"initDate\":\"2024-01-01\"," +
@@ -45,15 +48,16 @@ class ProductPriceIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.value").value(99.99));
 
-        // 3. Consultar precio vigente
+        
         mockMvc.perform(get("/products/" + productId + "/prices?date=2024-04-15"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.value").value(99.99));
 
-        // 4. Consultar historial
+        
         mockMvc.perform(get("/products/" + productId + "/prices"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.prices[0].value").value(99.99));
     }
 }
+
 

@@ -5,14 +5,15 @@ import java.util.List;
 import org.demo.seniorjavatechchallenge.domain.Price;
 import org.demo.seniorjavatechchallenge.domain.Product;
 import org.demo.seniorjavatechchallenge.dto.request.CreateProductRequest;
-import org.demo.seniorjavatechchallenge.dto.response.PriceResponse;
 import org.demo.seniorjavatechchallenge.dto.response.ProductPriceHistoryResponse;
 import org.demo.seniorjavatechchallenge.dto.response.ProductResponse;
 import org.demo.seniorjavatechchallenge.exception.ProductNotFoundException;
+import org.demo.seniorjavatechchallenge.mapper.ProductMapper;
 import org.demo.seniorjavatechchallenge.repository.PriceRepository;
 import org.demo.seniorjavatechchallenge.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 
 @Service
 public class ProductService {
@@ -25,30 +26,42 @@ public class ProductService {
         this.priceRepository = priceRepository;
     }
 
+    
     @Transactional
     public ProductResponse createProduct(CreateProductRequest request) {
-        Product product = productRepository.save(new Product(request.name(), request.description()));
-        return new ProductResponse(product.getId(), product.getName(), product.getDescription());
+        Product product = ProductMapper.toProduct(request);
+        Product savedProduct = productRepository.save(product);
+        return ProductMapper.toResponse(savedProduct);
     }
 
+    
     @Transactional(readOnly = true)
     public ProductPriceHistoryResponse getProductPriceHistory(Long productId) {
+        
         Product product = findProductOrThrow(productId);
-        List<PriceResponse> prices = priceRepository.findByProductIdOrderByInitDateAsc(productId)
-                .stream()
-                .map(this::toPriceResponse)
-                .toList();
-        return new ProductPriceHistoryResponse(product.getId(), product.getName(), product.getDescription(), prices);
+
+        
+        List<Price> prices = priceRepository.findByProductIdOrderByInitDateAsc(productId);
+        product.setPrices(prices);
+
+        return ProductMapper.toHistoryResponse(product);
     }
 
+    
     @Transactional(readOnly = true)
     public Product findProductOrThrow(Long productId) {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 
-    private PriceResponse toPriceResponse(Price price) {
-        return new PriceResponse(price.getValue(), price.getInitDate(), price.getEndDate());
+    
+    @Transactional
+    public Product findProductForUpdateOrThrow(Long productId) {
+        return productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 }
+
+
+
 

@@ -7,17 +7,19 @@ import org.demo.seniorjavatechchallenge.adapter.jpa.ProductJpaRepository;
 import org.demo.seniorjavatechchallenge.domain.Product;
 import org.springframework.stereotype.Component;
 
-/**
- * Adaptador JPA que implementa el puerto ProductRepository.
- * Convierte entre entidades de dominio y entidades JPA.
- */
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+
+
 @Component
 public class ProductRepositoryAdapter implements ProductRepository {
 
     private final ProductJpaRepository jpaRepository;
+    private final EntityManager entityManager;
 
-    public ProductRepositoryAdapter(ProductJpaRepository jpaRepository) {
+    public ProductRepositoryAdapter(ProductJpaRepository jpaRepository, EntityManager entityManager) {
         this.jpaRepository = jpaRepository;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -34,7 +36,14 @@ public class ProductRepositoryAdapter implements ProductRepository {
 
     @Override
     public Optional<Product> findByIdForUpdate(Long id) {
-        return jpaRepository.findByIdForUpdate(id).map(ProductJpaEntity::toDomain);
+        return jpaRepository.findById(id)
+                .map(entity -> {
+                    
+                    entityManager.lock(entity, LockModeType.PESSIMISTIC_WRITE);
+                    return entity.toDomain();
+                });
     }
 }
+
+
 

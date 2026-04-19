@@ -1,4 +1,4 @@
-FROM alpine:3.18
+FROM eclipse-temurin:21-jre-alpine
 RUN apk add --no-cache curl bash bc
 
 WORKDIR /app

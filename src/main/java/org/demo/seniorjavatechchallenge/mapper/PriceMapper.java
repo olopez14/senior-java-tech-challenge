@@ -10,33 +10,18 @@ import org.demo.seniorjavatechchallenge.dto.response.CreatedPriceResponse;
 import org.demo.seniorjavatechchallenge.dto.response.CurrentPriceResponse;
 import org.demo.seniorjavatechchallenge.dto.response.PriceResponse;
 
-/**
- * Mapper utility para convertir entre DTOs de Price y entidades de dominio.
- * Proporciona métodos builder para garantizar type-safety y validaciones.
- *
- * Uso:
- *   Price price = PriceMapper.toPrice(product, createPriceRequest);
- *   PriceResponse response = PriceMapper.toResponse(price);
- */
+
 public class PriceMapper {
 
     private PriceMapper() {
-        // Utility class
+        
     }
 
-    // ============================================
-    // PRICE MAPPERS
-    // ============================================
+    
+    
+    
 
-    /**
-     * Convierte CreatePriceRequest a entidad Price.
-     * Requiere el Product padre para establecer la relación.
-     *
-     * @param product Entidad Product padre
-     * @param request Request del cliente
-     * @return Entidad Price lista para persistir
-     * @throws IllegalArgumentException si falta información requerida
-     */
+    
     public static Price toPrice(Product product, CreatePriceRequest request) {
         if (product == null) {
             throw new IllegalArgumentException("Product no puede ser null");
@@ -44,7 +29,7 @@ public class PriceMapper {
         if (request == null) {
             throw new IllegalArgumentException("CreatePriceRequest no puede ser null");
         }
-
+        
         return new Price(
             product,
             request.value(),
@@ -53,18 +38,12 @@ public class PriceMapper {
         );
     }
 
-    /**
-     * Convierte entidad Price a PriceResponse.
-     * Para respuestas de historial de precios.
-     *
-     * @param price Entidad desde BD
-     * @return DTO de respuesta
-     */
+    
     public static PriceResponse toResponse(Price price) {
         if (price == null) {
             throw new IllegalArgumentException("Price no puede ser null");
         }
-
+        
         return PriceResponseBuilder.create()
                 .value(price.getValue())
                 .initDate(price.getInitDate())
@@ -72,33 +51,21 @@ public class PriceMapper {
                 .build();
     }
 
-    /**
-     * Convierte entidad Price a CurrentPriceResponse.
-     * Para respuesta de consulta de precio vigente.
-     *
-     * @param price Entidad desde BD
-     * @return DTO con precio vigente
-     */
+    
     public static CurrentPriceResponse toCurrentPriceResponse(Price price) {
         if (price == null) {
             throw new IllegalArgumentException("Price no puede ser null");
         }
-
+        
         return new CurrentPriceResponse(price.getValue());
     }
 
-    /**
-     * Convierte entidad Price a CreatedPriceResponse.
-     * Para respuesta de creación de precio (POST).
-     *
-     * @param price Entidad creada y persistida
-     * @return DTO con el precio creado
-     */
+    
     public static CreatedPriceResponse toCreatedResponse(Price price) {
         if (price == null) {
             throw new IllegalArgumentException("Price no puede ser null");
         }
-
+        
         return CreatedPriceResponseBuilder.create()
                 .productId(price.getProduct().getId())
                 .value(price.getValue())
@@ -107,9 +74,9 @@ public class PriceMapper {
                 .build();
     }
 
-    // ============================================
-    // BUILDER INTERNO PARA PriceResponse
-    // ============================================
+    
+    
+    
     public static class PriceResponseBuilder {
         private BigDecimal value;
         private LocalDate initDate;
@@ -146,9 +113,9 @@ public class PriceMapper {
         }
     }
 
-    // ============================================
-    // BUILDER INTERNO PARA CreatedPriceResponse
-    // ============================================
+    
+    
+    
     public static class CreatedPriceResponseBuilder {
         private Long productId;
         private BigDecimal value;
@@ -192,4 +159,6 @@ public class PriceMapper {
         }
     }
 }
+
+
 

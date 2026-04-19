@@ -16,9 +16,13 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Products & Prices API")
                         .version("0.0.1")
-                        .description("API para gestionar productos y precios históricos. Implementación con énfasis en rendimiento y caché Caffeine.")
+                        .description("API para gestionar productos y precios histÃ³ricos. ImplementaciÃ³n con Ã©nfasis en rendimiento y cachÃ© Caffeine.")
                         .contact(new Contact().name("Developer").email("dev@example.com"))
                         .license(new License().name("MIT")));
     }
 }
+
+
+
+
 
