@@ -118,20 +118,6 @@ docker-compose up --build
 podman-compose up --build
 ```
 
-Recomendaciones y notas:
-
-- Podman y Docker son CLI-compatibles en la mayoría de comandos; si usas Podman en modo rootless puede que necesites ajustes en el mapeo de puertos o en SELinux en sistemas Linux.
-- Antes de construir la imagen, asegúrate de haber ejecutado `mvnw package` para generar el JAR en `target/` si tu `Dockerfile` copia el artefacto desde `target/`. El `Dockerfile` del proyecto también está preparado para usar el JAR generado por la fase `package`.
-- Para producción, usar perfiles (`SPRING_PROFILES_ACTIVE=prod`) y desactivar Swagger/OpenAPI (propiedad `springdoc.api-docs.enabled=false` y `springdoc.swagger-ui.enabled=false`) es una buena práctica.
-- Si vas a publicar la imagen en un registry privado o público, etiqueta la imagen con el repo adecuado (`registry.example.com/your-repo/senior-java-tech-challenge:tag`) y realiza `docker push` ó `podman push`.
-
-
-## 🔎 Notas sobre dependencias y POM
-
-- Durante el desarrollo local añadimos una versión explícita para `spring-boot-starter-test` (4.0.5) en el `pom.xml` para evitar un problema de resolución en este entorno. Si tu proyecto tiene una gestión central (BOM) puedes revertir esa línea y confiar en el BOM.
-
----
-
 ## 📌 Supuestos y decisiones importantes
 
 - Tratamiento de fechas: las fechas son inclusivas para la definición de vigencia de un precio (documentado y testeado). Si se quiere otra convención, hay que indicarlo.
@@ -139,19 +125,3 @@ Recomendaciones y notas:
 - Caché: TTL 10 minutos, key por product+date, invalidación por product.
 
 ---
-
-## 📄 Qué falta / mejoras recomendadas (opcional)
-
-- Tests de integración adicionales: casos de error 400/404/409, y test que verifique la invalidación de cache (capturando logs o midiendo accesos a repo).
-- Documentación OpenAPI/Swagger.
-- Script de performance (k6/Gatling) en `docker-compose` para el bonus de rendimiento.
-
----
-
-## 📦 Entrega
-
-Incluye este README, el código fuente y el documento de explicación técnica `docs/INTERVIEW.md` con respuestas y guión para defender el diseño durante la prueba técnica.
-
----
-
-¡Buena suerte! Queremos ver cómo piensas, no solo cómo codificas.
