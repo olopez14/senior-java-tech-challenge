@@ -9,5 +9,3 @@ public record CreateProductRequest(
         String description) {
 }
 
-
-

@@ -7,5 +7,3 @@ public class PriceOverlapException extends RuntimeException {
     }
 }
 
-
-

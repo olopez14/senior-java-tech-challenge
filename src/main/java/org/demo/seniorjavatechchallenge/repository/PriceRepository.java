@@ -19,6 +19,12 @@ public interface PriceRepository {
 
     boolean existsOverlappingPrice(Long productId, LocalDate initDate, LocalDate endDate);
 
+    /**
+     * Returns the list of prices that overlap with the given interval for the product.
+     * Used by the service when applying truncation policies.
+     */
+    java.util.List<org.demo.seniorjavatechchallenge.domain.Price> findOverlappingPrices(Long productId, LocalDate initDate, LocalDate endDate);
+
     Price save(Price price);
 }
 

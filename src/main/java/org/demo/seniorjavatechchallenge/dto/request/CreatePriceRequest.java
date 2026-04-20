@@ -22,5 +22,3 @@ public record CreatePriceRequest(
         LocalDate endDate) {
 }
 
-
-

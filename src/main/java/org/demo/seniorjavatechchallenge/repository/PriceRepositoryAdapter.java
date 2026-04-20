@@ -51,6 +51,14 @@ public class PriceRepositoryAdapter implements PriceRepository {
     }
 
     @Override
+    public java.util.List<Price> findOverlappingPrices(Long productId, LocalDate initDate, LocalDate endDate) {
+        return jpaRepository.findAll(PriceSpecifications.overlappingWith(productId, initDate, endDate))
+                .stream()
+                .map(PriceJpaEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public Price save(Price price) {
         ProductJpaEntity jpaProduct = productJpaRepository
                 .findById(price.getProduct().getId())
