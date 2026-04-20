@@ -1,6 +1,7 @@
 package org.demo.seniorjavatechchallenge.service;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.demo.seniorjavatechchallenge.domain.Price;
 import org.demo.seniorjavatechchallenge.domain.Product;
@@ -16,6 +17,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.caffeine.CaffeineCache;
+import com.github.benmanes.caffeine.cache.Cache;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +42,23 @@ public class PriceService {
         validateDateRange(request);
         Product product = productService.findProductForUpdateOrThrow(productId);
 
-        if (priceRepository.existsOverlappingPrice(productId, request.initDate(), request.endDate())) {
+        List<Price> overlapping = priceRepository.findOverlappingPrices(productId, request.initDate(), request.endDate());
+
+        boolean conflict = overlapping.stream().anyMatch(p -> {
+            if (!p.getInitDate().isBefore(request.initDate())) return true;
+            if (p.getEndDate() != null && !p.getEndDate().isBefore(request.initDate())) return true;
+            return false;
+        });
+
+        if (conflict) {
             throw new PriceOverlapException(productId);
+        }
+
+        for (Price prev : overlapping) {
+            if (prev.getInitDate().isBefore(request.initDate()) && prev.getEndDate() == null) {
+                prev.setEndDate(request.initDate().minusDays(1));
+                priceRepository.save(prev);
+            }
         }
 
         Price priceEntity = PriceMapper.toPrice(product, request);
@@ -52,8 +69,8 @@ public class PriceService {
             try {
                 var cache = cacheManager.getCache("currentPrice");
                 if (cache instanceof CaffeineCache) {
-                    com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = ((CaffeineCache) cache).getNativeCache();
-                    
+                    Cache<Object, Object> nativeCache = ((CaffeineCache) cache).getNativeCache();
+
                     nativeCache.asMap().keySet().removeIf(k -> k != null && k.toString().startsWith(productId + "-"));
                 }
             } catch (Exception ex) {
