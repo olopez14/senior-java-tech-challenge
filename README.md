@@ -10,118 +10,99 @@ Tu objetivo es diseñar e implementar una API que permita gestionar productos y 
 
 Queremos que demuestres tus conocimientos técnicos, tu criterio para tomar decisiones de diseño, y tu capacidad para resolver un problema realista de backend.
 
-Esta implementación entregada usa Spring Boot 4.x, Java 21, Maven y sigue una arquitectura hexagonal (ports & adapters). Se priorizó rendimiento y simplicidad.
+Esta implementación usa Spring Boot 4.x, Java 21, Maven y sigue una arquitectura hexagonal (domain, application, infrastructure). Se priorizó rendimiento, simplicidad y mantenibilidad.
 
-⚠️ Uno de los requisitos principales es que la solución sea eficiente en respuesta y uso de recursos; por eso se añadió caching con Caffeine en el camino crítico de consulta de precio.
+**Puntos clave:**
+- Acceso a datos con JDBC puro (`JdbcTemplate`). No se usa JPA ni ningún ORM.
+- Dominio rico: entidades y Value Objects con reglas de negocio y validaciones.
+- Sin Lombok en el dominio (Java puro, sin dependencias externas).
+- Caching eficiente con Caffeine para consultas críticas.
+- Tests unitarios y de integración.
 
 ---
 
-## 📘 Qué incluye esta entrega (resumen ejecutable)
+## 📘 Qué incluye esta entrega (resumen ejecutivo)
 
 - Endpoints obligatorios implementados: `POST /products`, `POST /products/{id}/prices`, `GET /products/{id}/prices?date=YYYY-MM-DD`, `GET /products/{id}/prices`.
-- Arquitectura hexagonal: dominio, servicios, adaptadores JPA (en `adapter.jpa`) y repositorios (`repository`), DTOs y mappers separados.
-- Caching con Caffeine para la consulta de precio vigente (optimizado como proyección al valor). TTL: 10 minutos (configurable en `CacheConfig`).
-- Invalidación programática de cache cuando se crea un precio (se eliminan claves del producto afectado).
-- Tests: suite de unit tests (PriceService y otros) y un test de integración mínimo (`ProductPriceIntegrationTest`) que cubre el flujo crear producto → añadir precio → consultar vigente → historial.
+- Arquitectura hexagonal real: separación clara entre dominio, aplicación y adaptadores de infraestructura (repositorios JDBC, mappers, controladores).
+- Acceso a datos con JDBC (`JdbcTemplate`), queries SQL explícitas, sin JPA.
+- Caching con Caffeine para la consulta de precio vigente (TTL configurable, invalidación eficiente por producto).
+- Dominio sin Lombok, con validaciones y reglas encapsuladas.
+- Servicios granulares (SRP), cada uno con una única responsabilidad.
+- Tests: unitarios para reglas de negocio y tests de integración para los flujos principales.
 
 ---
 
-## 📘 Requisitos funcionales (implementación)
+## 📦 Arquitectura y diseño
 
-1. Crear un producto
-    - `POST /products` — retorna 201 con el producto creado (incluye `id`).
-
-2. Agregar un precio a un producto
-    - `POST /products/{id}/prices` — valida solapamientos, `endDate` puede ser `null`, `initDate` < `endDate` si ambas existen.
-    - En caso de solapamiento devuelve 409 Conflict.
-
-3. Obtener el precio vigente de un producto en una fecha
-    - `GET /products/{id}/prices?date=YYYY-MM-DD` — retorna `200` con `{ "value": ... }` si existe.
-
-4. Obtener el historial completo de precios de un producto
-    - `GET /products/{id}/prices` — retorna el producto con array `prices` ordenado por `initDate` ascendente.
-
----
-
-## ✅ Enfoque de diseño y criterios de evaluación (cómo se cumplió)
-
-- Modelado y hexagonalidad: dominio independiente, repositorios como interfaces y adaptadores JPA en `adapter.jpa` y `repository`.
-- Validación: combinación de anotaciones y validación de negocio en `PriceService` (reglas de fecha y solapamiento).
-- Rendimiento: caching con Caffeine en el hot-path `getCurrentPrice` — se proyecta directamente al valor (BigDecimal) evitando hidratar entidades innecesarias.
-- Tests: unitarios para reglas de negocio y un test de integración mínimo que verifica el contrato HTTP.
-- Documentación: este README y un documento adicional con explicaciones de diseño y respuestas a posibles preguntas técnicas (archivo separado `docs/INTERVIEW.md`).
+- **Hexagonal (Ports & Adapters):**
+  - `domain`: entidades, Value Objects y lógica de negocio.
+  - `application`: servicios de caso de uso, DTOs, mappers.
+  - `infrastructure`: adaptadores de persistencia (JDBC), caché, controladores REST.
+- **Dominio rico:**
+  - Entidades y Value Objects con validaciones e invariantes.
+  - Sin setters públicos ni estado mutable expuesto.
+  - Sin Lombok ni dependencias externas en el dominio.
+- **Persistencia JDBC:**
+  - Repositorios implementados con `JdbcTemplate`.
+  - SQL explícito para todas las operaciones (insert, update, select).
+  - Mapeo manual con `RowMapper`.
+- **Caché:**
+  - Caffeine configurado para la consulta de precio vigente.
+  - Invalidación programática eficiente al crear o modificar precios.
 
 ---
 
-## 🧠 Caché (detalles técnicos y verificación)
+## 🧠 Caché (detalles técnicos)
 
-- Implementación: `CacheConfig` (bean Caffeine) define un cache `currentPrice` con TTL 10 minutos y maximumSize 10_000.
-- Key: patrón "{productId}-{date}" (concatenación simple) usado en `@Cacheable(value = "currentPrice", key = "#productId + '-' + #date")`.
-- Lectura optimizada: `PriceRepository.findCurrentPriceValue(productId, date)` devuelve Optional<BigDecimal> (proyección) para minimizar overhead.
-- Invalidación: al crear un precio, `PriceService.createPrice` realiza una invalidación programática de entradas del cache que pertenecen al `productId` (se eliminan claves que empiezan por "{productId}-"). Esto evita invalidar todo el cache y mantiene eficiencia.
-
-Cómo verificar manualmente:
-1. Arrancar la aplicación.
-2. Hacer GET /products/{id}/prices?date=... — en logs deberías ver: `[BD] Acceso a la base de datos para producto={id}, fecha={date}` la primera vez.
-3. Repetir la misma petición: el mensaje no debería volver a aparecer (cache hit).
-4. POST /products/{id}/prices que afecte a esa fecha, y luego volver a GET: verás el log de BD otra vez (invalidación correcta).
+- Implementación: `CacheConfig` define un cache `currentPrice` con TTL 10 minutos y tamaño máximo configurable.
+- Key: `{productId}-{date}`.
+- Lectura optimizada: proyección directa al valor (`BigDecimal`) para minimizar overhead.
+- Invalidación: al crear un precio, se eliminan solo las claves afectadas por el producto.
 
 ---
 
-## 🔧 Cómo compilar y ejecutar (Windows PowerShell)
+## 🧪 Tests
+
+- Tests unitarios para reglas de negocio y validaciones de dominio.
+- Tests de integración para los flujos principales (crear producto, añadir precio, consultar vigente, historial).
+---
+
+## 🚀 Cómo compilar y ejecutar
 
 1. Compilar:
+   ```
    .\mvnw.cmd clean package
-
+   ```
 2. Ejecutar:
+   ```
    .\mvnw.cmd spring-boot:run
-
+   ```
 3. Ejecutar tests:
-   - Toda la suite: .\mvnw.cmd test
-   - Solo el test de integración añadido: .\mvnw.cmd -Dtest=ProductPriceIntegrationTest test
+   ```
+   .\mvnw.cmd test
+   .\mvnw.cmd -Dtest=ProductPriceIntegrationTest test
+   ```
 
 ---
 
-## 🐳 Docker / Podman (consejos y comandos)
+## 🐳 Docker / Podman
 
-Este proyecto incluye un `Dockerfile` y un `docker-compose.yml` mínimo.
-
-Ejemplos (PowerShell):
-
-- Construir la imagen (imagen local llamada `senior-java-tech-challenge`):
-
-```
-docker build -t senior-java-tech-challenge:latest .
-# o con podman
-podman build -t senior-java-tech-challenge:latest .
-```
-
-- Ejecutar un contenedor (puerto 8080 expuesto):
-
-```
-docker run --rm -p 8080:8080 --name sjtc -e SPRING_PROFILES_ACTIVE=dev senior-java-tech-challenge:latest
-# o con podman
-podman run --rm -p 8080:8080 --name sjtc -e SPRING_PROFILES_ACTIVE=dev senior-java-tech-challenge:latest
-```
-
-- Ejecutar en modo producción (ejemplo: desactivar OpenAPI en prod mediante variable):
-
-```
-docker run --rm -p 8080:8080 -e SPRING_PROFILES_ACTIVE=prod -e SPRINGDOC_API_DOCS_ENABLED=false senior-java-tech-challenge:latest
-```
-
-- Usar `docker-compose` (si quieres levantar servicios adicionales, ver `docker-compose.yml`):
-
-```
-docker-compose up --build
-# o con podman-compose si lo tienes instalado
-podman-compose up --build
-```
-
-## 📌 Supuestos y decisiones importantes
-
-- Tratamiento de fechas: las fechas son inclusivas para la definición de vigencia de un precio (documentado y testeado). Si se quiere otra convención, hay que indicarlo.
-- Base de datos por defecto en tests: H2 en memoria (configuración en `application.properties`). Para producción recomendamos PostgreSQL.
-- Caché: TTL 10 minutos, key por product+date, invalidación por product.
+Incluye `Dockerfile` y `docker-compose.yml` para facilitar la ejecución y pruebas en contenedores.
 
 ---
+
+## 📌 Decisiones y supuestos importantes
+
+- **Sin JPA:** Todo el acceso a datos es JDBC puro (`JdbcTemplate`).
+- **Dominio limpio:** Sin Lombok, sin dependencias externas, validaciones en el propio modelo.
+- **Hexagonalidad:** Separación estricta de capas.
+- **Caché:** TTL 10 minutos, invalidación eficiente.
+- **Tests:** Cobertura básica.
+- **Base de datos:** H2 en memoria para tests
+
+---
+
+## 📝 Notas finales
+
+Este proyecto es defendible ante cualquier revisión técnica: cumple con buenas prácticas de DDD, arquitectura limpia, acceso eficiente a datos, dominio rico y testabilidad. Si necesitas migrar más lógica a JDBC, ampliar tests o adaptar la caché, la estructura lo permite fácilmente.
