@@ -1,24 +1,31 @@
 package org.demo.seniorjavatechchallenge.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
-import org.demo.seniorjavatechchallenge.domain.Price;
-import org.demo.seniorjavatechchallenge.domain.Product;
-import org.demo.seniorjavatechchallenge.dto.request.CreatePriceRequest;
-import org.demo.seniorjavatechchallenge.dto.response.CreatedPriceResponse;
-import org.demo.seniorjavatechchallenge.exception.InvalidDateRangeException;
-import org.demo.seniorjavatechchallenge.exception.PriceNotFoundForDateException;
-import org.demo.seniorjavatechchallenge.exception.PriceOverlapException;
-import org.demo.seniorjavatechchallenge.exception.ProductNotFoundException;
-import org.demo.seniorjavatechchallenge.repository.PriceRepository;
+import org.demo.seniorjavatechchallenge.application.service.CreatePriceService;
+import org.demo.seniorjavatechchallenge.application.service.GetCurrentPriceService;
+import org.demo.seniorjavatechchallenge.application.service.FindProductForUpdateService;
+import org.demo.seniorjavatechchallenge.application.service.FindProductService;
+import org.demo.seniorjavatechchallenge.domain.model.Price;
+import org.demo.seniorjavatechchallenge.domain.model.Product;
+import org.demo.seniorjavatechchallenge.application.dto.request.CreatePriceRequest;
+import org.demo.seniorjavatechchallenge.application.dto.response.CreatedPriceResponse;
+
+import org.demo.seniorjavatechchallenge.domain.exception.InvalidDateRangeException;
+import org.demo.seniorjavatechchallenge.domain.exception.PriceNotFoundForDateException;
+import org.demo.seniorjavatechchallenge.domain.exception.PriceOverlapException;
+import org.demo.seniorjavatechchallenge.domain.exception.ProductNotFoundException;
+import org.demo.seniorjavatechchallenge.domain.exception.PreconditionViolationException;
+import org.demo.seniorjavatechchallenge.domain.model.ProductDescription;
+import org.demo.seniorjavatechchallenge.domain.model.ProductName;
+import org.demo.seniorjavatechchallenge.domain.repository.PriceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,22 +39,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PriceServiceTest {
 
     @Mock
-    private ProductService productService;
-
-    @Mock
     private PriceRepository priceRepository;
+    @Mock
+    private FindProductForUpdateService findProductForUpdateService;
+    @Mock
+    private FindProductService findProductService;
 
-    @InjectMocks
-    private PriceService priceService;
+    private CreatePriceService createPriceService;
+    private GetCurrentPriceService getCurrentPriceService;
 
     private Product mockProduct;
-    private Long productId = 1L;
+    private final Long productId = 1L;
 
     @BeforeEach
     void setUp() {
-        mockProduct = new Product("Test Product", "Test Description");
+        mockProduct = new Product(
+            productId,
+            new ProductName("Test Product"),
+            new ProductDescription("Test Description")
+        );
         mockProduct = spy(mockProduct);
-        lenient().when(mockProduct.getId()).thenReturn(productId);
+        createPriceService = new CreatePriceService(priceRepository, findProductForUpdateService, null);
+        getCurrentPriceService = new GetCurrentPriceService(priceRepository, findProductService);
     }
 
     @Test
@@ -59,19 +72,37 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, endDate);
 
-        when(productService.findProductForUpdateOrThrow(productId)).thenReturn(mockProduct);
-        when(priceRepository.existsOverlappingPrice(productId, initDate, endDate)).thenReturn(false);
+        when(findProductForUpdateService.execute(productId)).thenReturn(mockProduct);
         when(priceRepository.save(any(Price.class))).thenAnswer(invocation -> {
             Price price = invocation.getArgument(0);
-            return new Price(price.getProduct(), price.getValue(), price.getInitDate(), price.getEndDate());
+            return new Price(
+                price.getProduct(),
+                price.getValue(),
+                price.getDateRange()
+            );
         });
 
-        CreatedPriceResponse response = priceService.createPrice(productId, request);
+        CreatedPriceResponse response = createPriceService.execute(productId, request);
 
         assertEquals(value, response.value());
         assertEquals(initDate, response.initDate());
         assertEquals(endDate, response.endDate());
         verify(priceRepository, times(1)).save(any(Price.class));
+    }
+
+    @Test
+    @DisplayName("Should throw PreconditionViolationException when CreatePriceRequest is null")
+    void createPrice_WithNullRequest_ThrowsPreconditionViolationException() {
+        assertThrows(PreconditionViolationException.class, () -> createPriceService.execute(productId, null));
+        verify(priceRepository, never()).save(any(Price.class));
+    }
+
+    @Test
+    @DisplayName("Should throw PreconditionViolationException when productId is null")
+    void createPrice_WithNullProductId_ThrowsPreconditionViolationException() {
+        CreatePriceRequest request = new CreatePriceRequest(new BigDecimal("10.0"), LocalDate.now(), null);
+        assertThrows(PreconditionViolationException.class, () -> createPriceService.execute(null, request));
+        verify(priceRepository, never()).save(any(Price.class));
     }
 
     @Test
@@ -82,19 +113,38 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, null);
 
-        when(productService.findProductForUpdateOrThrow(productId)).thenReturn(mockProduct);
-        when(priceRepository.existsOverlappingPrice(productId, initDate, null)).thenReturn(false);
+        when(findProductForUpdateService.execute(productId)).thenReturn(mockProduct);
         when(priceRepository.save(any(Price.class))).thenAnswer(invocation -> {
             Price price = invocation.getArgument(0);
-            return new Price(price.getProduct(), price.getValue(), price.getInitDate(), price.getEndDate());
+            return new Price(
+                price.getProduct(),
+                price.getValue(),
+                price.getDateRange()
+            );
         });
 
-        CreatedPriceResponse response = priceService.createPrice(productId, request);
+        CreatedPriceResponse response = createPriceService.execute(productId, request);
 
         assertEquals(value, response.value());
         assertEquals(initDate, response.initDate());
-        assertEquals(null, response.endDate());
+        assertNull(response.endDate());
         verify(priceRepository, times(1)).save(any(Price.class));
+    }
+
+    @Test
+    @DisplayName("Should throw PreconditionViolationException when CreatePriceRequest.value is null")
+    void createPrice_WithNullValue_ThrowsPreconditionViolationException() {
+        CreatePriceRequest request = new CreatePriceRequest(null, LocalDate.now(), null);
+        assertThrows(PreconditionViolationException.class, () -> createPriceService.execute(productId, request));
+        verify(priceRepository, never()).save(any(Price.class));
+    }
+
+    @Test
+    @DisplayName("Should throw PreconditionViolationException when CreatePriceRequest.initDate is null")
+    void createPrice_WithNullInitDate_ThrowsPreconditionViolationException() {
+        CreatePriceRequest request = new CreatePriceRequest(new BigDecimal("10.0"), null, null);
+        assertThrows(PreconditionViolationException.class, () -> createPriceService.execute(productId, request));
+        verify(priceRepository, never()).save(any(Price.class));
     }
 
     @Test
@@ -106,7 +156,7 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, endDate);
 
-        assertThrows(InvalidDateRangeException.class, () -> priceService.createPrice(productId, request));
+        assertThrows(InvalidDateRangeException.class, () -> createPriceService.execute(productId, request));
         verify(priceRepository, never()).save(any(Price.class));
     }
 
@@ -119,7 +169,7 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, endDate);
 
-        assertThrows(InvalidDateRangeException.class, () -> priceService.createPrice(productId, request));
+        assertThrows(InvalidDateRangeException.class, () -> createPriceService.execute(productId, request));
         verify(priceRepository, never()).save(any(Price.class));
     }
 
@@ -132,10 +182,16 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, endDate);
 
-        when(productService.findProductForUpdateOrThrow(productId)).thenReturn(mockProduct);
-        when(priceRepository.existsOverlappingPrice(productId, initDate, endDate)).thenReturn(true);
+        when(findProductForUpdateService.execute(productId)).thenReturn(mockProduct);
+        // Simular solapamiento correctamente:
+        Price overlappingPrice = new Price(
+            mockProduct,
+            new org.demo.seniorjavatechchallenge.domain.model.Money(value),
+            new org.demo.seniorjavatechchallenge.domain.model.DateRange(initDate, endDate)
+        );
+        when(priceRepository.findOverlappingPrices(productId, initDate, endDate)).thenReturn(List.of(overlappingPrice));
 
-        assertThrows(PriceOverlapException.class, () -> priceService.createPrice(productId, request));
+        assertThrows(PriceOverlapException.class, () -> createPriceService.execute(productId, request));
         verify(priceRepository, never()).save(any(Price.class));
     }
 
@@ -148,9 +204,9 @@ class PriceServiceTest {
 
         CreatePriceRequest request = new CreatePriceRequest(value, initDate, endDate);
 
-        when(productService.findProductForUpdateOrThrow(productId)).thenThrow(new ProductNotFoundException(productId));
+        when(findProductForUpdateService.execute(productId)).thenThrow(new ProductNotFoundException(productId));
 
-        assertThrows(ProductNotFoundException.class, () -> priceService.createPrice(productId, request));
+        assertThrows(ProductNotFoundException.class, () -> createPriceService.execute(productId, request));
         verify(priceRepository, never()).save(any(Price.class));
     }
 
@@ -160,7 +216,7 @@ class PriceServiceTest {
         LocalDate date = LocalDate.of(2024, 4, 15);
         when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.of(new BigDecimal("99.99")));
 
-        var response = priceService.getCurrentPrice(productId, date);
+        var response = getCurrentPriceService.execute(productId, date);
 
         assertEquals(new BigDecimal("99.99"), response.value());
         verify(priceRepository, times(1)).findCurrentPriceValue(productId, date);
@@ -171,11 +227,11 @@ class PriceServiceTest {
     void getCurrentPrice_WithNoPriceForDate_ThrowsPriceNotFoundForDateException() {
         LocalDate date = LocalDate.of(2024, 4, 15);
 
-        when(productService.findProductOrThrow(productId)).thenReturn(mockProduct);
+        when(findProductService.execute(productId)).thenReturn(mockProduct);
         when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.empty());
 
         assertThrows(PriceNotFoundForDateException.class,
-                     () -> priceService.getCurrentPrice(productId, date));
+                     () -> getCurrentPriceService.execute(productId, date));
     }
 
     @Test
@@ -184,16 +240,12 @@ class PriceServiceTest {
         LocalDate date = LocalDate.of(2024, 4, 15);
 
         when(priceRepository.findCurrentPriceValue(productId, date)).thenReturn(Optional.empty());
-        when(productService.findProductOrThrow(productId)).thenThrow(new ProductNotFoundException(productId));
+        when(findProductService.execute(productId)).thenThrow(new ProductNotFoundException(productId));
 
         assertThrows(ProductNotFoundException.class,
-                     () -> priceService.getCurrentPrice(productId, date));
+                     () -> getCurrentPriceService.execute(productId, date));
         verify(priceRepository, times(1)).findCurrentPriceValue(productId, date);
-        verify(productService, times(1)).findProductOrThrow(productId);
+        verify(findProductService, times(1)).execute(productId);
     }
-
 }
-
-
-
 

@@ -27,15 +27,14 @@ services:
 
   benchmark:
     build:
-      context: .
-      dockerfile: Dockerfile.benchmark
+      context: ./benchmark
+      dockerfile: Dockerfile
     image: product-benchmark:latest
     container_name: product-benchmark
     networks:
       - product-network
     depends_on:
       - app
-    command: sh -c "chmod +x /app/benchmark.sh && /app/benchmark.sh"
     deploy:
       resources:
         limits:

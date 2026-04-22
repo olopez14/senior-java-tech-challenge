@@ -5,3 +5,5 @@ WORKDIR /app
 COPY benchmark.sh .
 
 ENTRYPOINT ["bash", "benchmark.sh"]
+
+
